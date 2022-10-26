@@ -12,7 +12,7 @@ public class ServiceRegistrator {
             // Create a JmDNS instance
             JmDNS jmdns = JmDNS.create(InetAddress.getLocalHost());
             // Register a service
-            ServiceInfo serviceInfo = ServiceInfo.create("_chathub._tcp.local.", "Sample Server", 5476, "ip=" + InetAddress.getLocalHost().getHostAddress());
+            ServiceInfo serviceInfo = ServiceInfo.create("_chathub._tcp.local.", "Sample Server", 5476, "");
             jmdns.registerService(serviceInfo);
             System.out.println("[Zeroconf] Service registered");
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
