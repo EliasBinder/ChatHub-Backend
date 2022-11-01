@@ -1,5 +1,6 @@
 package it.eliasandandrea.chathub.backend.server.handlers;
 
+import it.eliasandandrea.chathub.shared.crypto.CryptManager;
 import it.eliasandandrea.chathub.shared.model.ChatEntity;
 import it.eliasandandrea.chathub.shared.model.User;
 import it.eliasandandrea.chathub.shared.protocol.ClientEvent;
@@ -26,14 +27,18 @@ public class HandshakeHandler implements RequestHandler<ClientEvent, ServerEvent
     @Override
     public ServerEvent handle(Socket socket, ClientEvent payload) {
         HandshakeRequestEvent handshakeRequestEvent = (HandshakeRequestEvent) payload;
+        User newUser;
         try {
-            User newUser = new User("", handshakeRequestEvent.getPublicKey());
+            newUser = new User("", handshakeRequestEvent.getPublicKey());
+            newUser.UUID = UUID.randomUUID().toString();
             callback.onNewUser(socket, newUser);
         } catch (Exception e) {
             e.printStackTrace();
+            return null;
         }
         HandshakeResponseEvent handshakeResponseEvent = new HandshakeResponseEvent();
-        handshakeResponseEvent.uuid = UUID.randomUUID().toString();
+        handshakeResponseEvent.uuid = newUser.getUUID();
+        handshakeResponseEvent.serverPublicKey = CryptManager.publicKeyToBytes(serverPublicKey);
         handshakeResponseEvent.chats = new ChatEntity[]{
             new User("TestUser1", null),
             new User("TestUser2", null),

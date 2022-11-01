@@ -3,12 +3,16 @@ package it.eliasandandrea.chathub.backend;
 import it.eliasandandrea.chathub.backend.configUtil.Configuration;
 import it.eliasandandrea.chathub.backend.server.BackendUnifiedService;
 import it.eliasandandrea.chathub.backend.server.handlers.HandshakeHandler;
+import it.eliasandandrea.chathub.backend.server.handlers.RequestHandler;
 import it.eliasandandrea.chathub.backend.zeroconf.ServiceRegistrar;
 import it.eliasandandrea.chathub.shared.crypto.CryptManager;
 import it.eliasandandrea.chathub.shared.crypto.EncryptedObjectPacket;
 import it.eliasandandrea.chathub.shared.crypto.Packet;
 import it.eliasandandrea.chathub.shared.model.User;
+import it.eliasandandrea.chathub.shared.protocol.ClientEvent;
+import it.eliasandandrea.chathub.shared.protocol.ServerEvent;
 import it.eliasandandrea.chathub.shared.protocol.clientEvents.HandshakeRequestEvent;
+import it.eliasandandrea.chathub.shared.protocol.clientEvents.SetUsernameEvent;
 import it.eliasandandrea.chathub.shared.util.LocalPaths;
 import it.eliasandandrea.chathub.shared.util.Log;
 
@@ -67,7 +71,6 @@ public class ChatHubBackend {
         service.addResponseInterceptor((socket, request, response) -> {
             if (this.clients.containsKey(socket)) {
                 try {
-                    System.out.println("Encrypting response");
                     return CryptManager.encrypt(
                             response.getData(), this.clients.get(socket).getPublicKey());
                 } catch (Exception e) {
@@ -76,13 +79,25 @@ public class ChatHubBackend {
             }
             return null;
         });
+
+
         service.addHandler(
                 HandshakeRequestEvent.class,
                 new HandshakeHandler(cryptManager.getPublicKey(), (socket, newUser) -> {
-                    System.out.println("Adding new user. Length of public key: " + newUser.publicKey.length);
                     this.clients.put(socket, newUser);
                     Log.info(String.format("New user connected: %s", newUser.getUUID()));
                 })
+        );
+
+        service.addHandler(
+                SetUsernameEvent.class,
+                (RequestHandler<ClientEvent, ServerEvent>) (socket, payload) -> {
+                    SetUsernameEvent event = (SetUsernameEvent) payload;
+                    User user = clients.get(socket);
+                    user.username = event.username;
+                    Log.info(String.format("User %s set username to %s", user.getUUID(), user.username));
+                    return null;
+                }
         );
 
         boolean run = true;

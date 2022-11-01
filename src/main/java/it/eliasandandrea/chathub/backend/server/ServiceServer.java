@@ -64,7 +64,7 @@ public abstract class ServiceServer {
         }
     }
 
-    public abstract Packet onAccepted(Socket socket, DataInputStream dis, DataOutputStream dos);
+    public abstract Packet onAccepted(Socket socket, DataInputStream dis, DataOutputStream dos) throws IOException;
 
     public abstract void onException(Exception e, Socket socket);
 }

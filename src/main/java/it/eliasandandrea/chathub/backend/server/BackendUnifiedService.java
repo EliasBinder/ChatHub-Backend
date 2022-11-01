@@ -34,11 +34,11 @@ public class BackendUnifiedService extends ServiceServer {
     }
 
     @Override
-    public Packet onAccepted(Socket socket, DataInputStream din, DataOutputStream dos) {
+    public Packet onAccepted(Socket socket, DataInputStream din, DataOutputStream dos) throws IOException {
         Packet packet = (Packet) SocketStreams.readObject(din);
         if (packet == null) {
             onException(new IOException("Bad input payload"), socket);
-            return null;
+            throw new IOException("Bad input payload");
         }
         for (final PacketInterceptor interceptor : this.packetInterceptors) {
             packet = interceptor.intercept(packet);
@@ -69,8 +69,7 @@ public class BackendUnifiedService extends ServiceServer {
         Log.warning("exception in BackendUnifiedService", e);
     }
 
-    @SuppressWarnings("unchecked")
-    public <Req extends ClientEvent, Res extends ServerEvent> void addHandler(final Class<HandshakeRequestEvent> cl, HandshakeHandler rh) {
+    public void addHandler(final Class<? extends ClientEvent> cl, RequestHandler rh) {
         this.handlers.put(cl, (RequestHandler<ClientEvent, ServerEvent>) rh);
     }
 
