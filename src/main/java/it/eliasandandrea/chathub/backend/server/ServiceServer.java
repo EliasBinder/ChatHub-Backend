@@ -1,10 +1,10 @@
-package it.eliasandandrea.chathubbackend.server;
+package it.eliasandandrea.chathub.backend.server;
 
-import it.eliasandandrea.chathub.model.control.response.ErrorResponse;
-import it.eliasandandrea.chathub.model.crypto.Packet;
-import it.eliasandandrea.chathubbackend.util.Log;
-import it.eliasandandrea.chathubbackend.util.ObjectByteConverter;
-import it.eliasandandrea.chathubbackend.util.SocketStreams;
+import it.eliasandandrea.chathub.shared.crypto.Packet;
+import it.eliasandandrea.chathub.shared.protocol.Error;
+import it.eliasandandrea.chathub.shared.util.Log;
+import it.eliasandandrea.chathub.shared.util.ObjectByteConverter;
+import it.eliasandandrea.chathub.shared.util.SocketStreams;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -35,7 +35,7 @@ public abstract class ServiceServer {
     public static void respondWithError(Socket socket, Exception e) {
         try {
             byte[] payload = ObjectByteConverter.serialize(
-                    new ErrorResponse(e.getClass().getSimpleName(), e.getMessage()));
+                    new Error(e.getClass().getSimpleName(), e.getMessage()));
             if (payload != null) {
                 socket.getOutputStream().write(payload);
                 socket.getOutputStream().close();

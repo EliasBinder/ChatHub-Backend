@@ -1,13 +1,14 @@
-package it.eliasandandrea.chathubbackend.server;
+package it.eliasandandrea.chathub.backend.server;
 
-import it.eliasandandrea.chathub.model.control.request.Request;
-import it.eliasandandrea.chathub.model.control.response.Response;
-import it.eliasandandrea.chathub.model.crypto.EncryptedObjectPacket;
-import it.eliasandandrea.chathub.model.crypto.Packet;
-import it.eliasandandrea.chathubbackend.server.handlers.RequestHandler;
-import it.eliasandandrea.chathubbackend.util.Log;
-import it.eliasandandrea.chathubbackend.util.ObjectByteConverter;
-import it.eliasandandrea.chathubbackend.util.SocketStreams;
+import it.eliasandandrea.chathub.backend.server.handlers.HandshakeHandler;
+import it.eliasandandrea.chathub.backend.server.handlers.RequestHandler;
+import it.eliasandandrea.chathub.shared.crypto.Packet;
+import it.eliasandandrea.chathub.shared.protocol.ClientEvent;
+import it.eliasandandrea.chathub.shared.protocol.ServerEvent;
+import it.eliasandandrea.chathub.shared.protocol.clientEvents.HandshakeRequestEvent;
+import it.eliasandandrea.chathub.shared.util.Log;
+import it.eliasandandrea.chathub.shared.util.ObjectByteConverter;
+import it.eliasandandrea.chathub.shared.util.SocketStreams;
 
 import java.io.IOException;
 import java.net.Socket;
@@ -18,7 +19,7 @@ import java.util.Map;
 
 public class BackendUnifiedService extends ServiceServer {
 
-    private final Map<Class<? extends Request>, RequestHandler<Request, Response>> handlers;
+    private final Map<Class<? extends ClientEvent>, RequestHandler<ClientEvent, ServerEvent>> handlers;
     private final List<PacketInterceptor> packetInterceptors;
     private final List<ResponseInterceptor> responseInterceptors;
 
@@ -39,13 +40,13 @@ public class BackendUnifiedService extends ServiceServer {
         for (final PacketInterceptor interceptor : this.packetInterceptors) {
             packet = interceptor.intercept(packet);
         }
-        final Request request = (Request) ObjectByteConverter.deserialize(packet.getData());
+        final ClientEvent request = (ClientEvent) ObjectByteConverter.deserialize(packet.getData());
         if (request == null) {
             onException(new IOException("Bad input payload"), socket);
             return null;
         }
         if (this.handlers.containsKey(request.getClass())) {
-            final Response response = this.handlers.get(
+            final ServerEvent response = this.handlers.get(
                     request.getClass()).handle(socket, request);
             byte[] payload = ObjectByteConverter.serialize(response);
 
@@ -67,8 +68,8 @@ public class BackendUnifiedService extends ServiceServer {
     }
 
     @SuppressWarnings("unchecked")
-    public <Req extends Request, Res extends Response> void addHandler(final Class<Req> cl, RequestHandler<Req, Res> rh) {
-        this.handlers.put(cl, (RequestHandler<Request, Response>) rh);
+    public <Req extends ClientEvent, Res extends ServerEvent> void addHandler(final Class<HandshakeRequestEvent> cl, HandshakeHandler rh) {
+        this.handlers.put(cl, (RequestHandler<ClientEvent, ServerEvent>) rh);
     }
 
     public void addPacketInterceptor(final PacketInterceptor packetInterceptor) {
@@ -83,6 +84,6 @@ public class BackendUnifiedService extends ServiceServer {
         Packet intercept(Packet packet);
     }
     public interface ResponseInterceptor {
-        Packet intercept(Request request, Packet response);
+        Packet intercept(ClientEvent request, Packet response);
     }
 }

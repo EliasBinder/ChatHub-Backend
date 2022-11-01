@@ -9,5 +9,8 @@
         <module name="ChatHub-Backend" />
       </profile>
     </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="ChatHub-Backend" target="17" />
+    </bytecodeTargetLevel>
   </component>
 </project>

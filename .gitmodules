@@ -1,0 +1,3 @@
+[submodule "ChatHub-Shared"]
+	path = ChatHub-Shared
+	url = https://github.com/EliasBinder/ChatHub-Shared.git
