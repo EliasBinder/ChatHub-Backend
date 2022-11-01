@@ -21,6 +21,26 @@ public class ChatHubBackend {
     private final Map<String, User> clients;
     private CryptManager cryptManager;
 
+    //
+
+
+
+
+
+
+
+
+    // USE buildOnUNIX.sh in root dir to ensure pulling and building the submodule at least once in order to use it for the build of the backend or client application
+
+
+
+
+
+
+
+
+    //
+
     public ChatHubBackend(Path pubPath, Path privPath, String password) throws Exception {
         this.clients = new HashMap<>();
         Path dataDir = LocalPaths.getData();
