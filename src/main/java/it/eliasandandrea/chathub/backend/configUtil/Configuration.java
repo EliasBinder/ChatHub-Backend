@@ -20,7 +20,7 @@ public class Configuration {
 
     public static void init(){
         try {
-            File configFileDir = getConfigurationFile();
+            File configFileDir = getJarPath();
             File configFile = new File(configFileDir, "config.properties");
             System.out.println("Configuration file: " + configFile.getAbsolutePath());
             if (!configFile.exists()){
@@ -51,7 +51,7 @@ public class Configuration {
         return (String) properties.getOrDefault(key, defaultValues.get(key));
     }
 
-    private static File getConfigurationFile() throws URISyntaxException {
+    private static File getJarPath() throws URISyntaxException {
         return new File(Configuration.class.getProtectionDomain().getCodeSource().getLocation().toURI());
     }
 }

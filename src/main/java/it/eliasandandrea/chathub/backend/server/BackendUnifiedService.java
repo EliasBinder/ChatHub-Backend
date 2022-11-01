@@ -1,6 +1,5 @@
 package it.eliasandandrea.chathub.backend.server;
 
-import it.eliasandandrea.chathub.backend.server.handlers.HandshakeHandler;
 import it.eliasandandrea.chathub.backend.server.handlers.RequestHandler;
 import it.eliasandandrea.chathub.shared.crypto.Packet;
 import it.eliasandandrea.chathub.shared.model.User;
@@ -50,7 +49,7 @@ public class BackendUnifiedService extends ServiceServer {
         }
         if (this.handlers.containsKey(request.getClass())) {
             final ServerEvent response = this.handlers.get(
-                    request.getClass()).handle(socket, request);
+                    request.getClass()).handle(socket, din, dos, request);
             byte[] payload = ObjectByteConverter.serialize(response);
             Packet resPacket = new Packet(payload);
             for (final ResponseInterceptor interceptor : this.responseInterceptors) {

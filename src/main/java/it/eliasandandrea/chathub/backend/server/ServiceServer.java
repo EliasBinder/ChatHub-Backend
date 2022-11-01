@@ -39,7 +39,7 @@ public abstract class ServiceServer {
                     } catch (Exception ex){
                         connected = false;
                         Log.error(ex.getMessage());
-                        onException(ex, client);
+                        onException(ex, null);
                     }
                 }
             });
