@@ -6,6 +6,8 @@ import it.eliasandandrea.chathub.shared.util.Log;
 import it.eliasandandrea.chathub.shared.util.ObjectByteConverter;
 import it.eliasandandrea.chathub.shared.util.SocketStreams;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -22,21 +24,22 @@ public abstract class ServiceServer {
     public void waitForConnection() {
         try {
             final Socket client = this.socket.accept();
+            final DataInputStream dis = new DataInputStream(client.getInputStream());
+            final DataOutputStream dos = new DataOutputStream(client.getOutputStream());
             Log.info("accepted from " + client.getInetAddress());
             Executors.newSingleThreadExecutor().submit(() -> {
-                while (client.isConnected()){
+                boolean connected = true;
+                while (connected){
                     try{
-                        Packet response = this.onAccepted(client);
+                        Packet response = this.onAccepted(client, dis, dos);
                         if (response != null) {
                             Log.info("writing response");
-                            SocketStreams.writeObject(client, response);
+                            SocketStreams.writeObject(dos, response);
                         }
-                    } finally {
-                        try {
-                            client.close();
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
+                    } catch (Exception ex){
+                        connected = false;
+                        Log.error(ex.getMessage());
+                        onException(ex, client);
                     }
                 }
             });
@@ -61,7 +64,7 @@ public abstract class ServiceServer {
         }
     }
 
-    public abstract Packet onAccepted(Socket socket);
+    public abstract Packet onAccepted(Socket socket, DataInputStream dis, DataOutputStream dos);
 
     public abstract void onException(Exception e, Socket socket);
 }

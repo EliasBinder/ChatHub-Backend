@@ -11,6 +11,8 @@ import it.eliasandandrea.chathub.shared.util.Log;
 import it.eliasandandrea.chathub.shared.util.ObjectByteConverter;
 import it.eliasandandrea.chathub.shared.util.SocketStreams;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -32,8 +34,8 @@ public class BackendUnifiedService extends ServiceServer {
     }
 
     @Override
-    public Packet onAccepted(Socket socket) {
-        Packet packet = (Packet) SocketStreams.readObject(socket);
+    public Packet onAccepted(Socket socket, DataInputStream din, DataOutputStream dos) {
+        Packet packet = (Packet) SocketStreams.readObject(din);
         if (packet == null) {
             onException(new IOException("Bad input payload"), socket);
             return null;
@@ -41,7 +43,7 @@ public class BackendUnifiedService extends ServiceServer {
         for (final PacketInterceptor interceptor : this.packetInterceptors) {
             packet = interceptor.intercept(packet);
         }
-        final ClientEvent request = (ClientEvent) ObjectByteConverter.deserialize(packet.getData());
+        final ClientEvent request = (ClientEvent) packet.getSerializable();
         if (request == null) {
             onException(new IOException("Bad input payload"), socket);
             return null;
@@ -50,7 +52,6 @@ public class BackendUnifiedService extends ServiceServer {
             final ServerEvent response = this.handlers.get(
                     request.getClass()).handle(socket, request);
             byte[] payload = ObjectByteConverter.serialize(response);
-
             Packet resPacket = new Packet(payload);
             for (final ResponseInterceptor interceptor : this.responseInterceptors) {
                 resPacket = interceptor.intercept(socket, request, resPacket);
