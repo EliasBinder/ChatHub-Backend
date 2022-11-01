@@ -9,6 +9,7 @@ import it.eliasandandrea.chathub.shared.util.SocketStreams;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.concurrent.Executors;
 
 public abstract class ServiceServer {
 
@@ -22,11 +23,24 @@ public abstract class ServiceServer {
         try {
             final Socket client = this.socket.accept();
             Log.info("accepted from " + client.getInetAddress());
-            Packet response = this.onAccepted(client);
-            if (response != null) {
-                Log.info("writing response");
-                SocketStreams.writeObject(client, response);
-            }
+            Executors.newSingleThreadExecutor().submit(() -> {
+                while (client.isConnected()){
+                    try{
+                        Packet response = this.onAccepted(client);
+                        if (response != null) {
+                            Log.info("writing response");
+                            SocketStreams.writeObject(client, response);
+                        }
+                    } finally {
+                        try {
+                            client.close();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            });
+
         } catch (IOException e) {
             this.onException(e, null);
         }

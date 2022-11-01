@@ -12,40 +12,21 @@ import it.eliasandandrea.chathub.shared.protocol.clientEvents.HandshakeRequestEv
 import it.eliasandandrea.chathub.shared.util.LocalPaths;
 import it.eliasandandrea.chathub.shared.util.Log;
 
+import java.net.Socket;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
 public class ChatHubBackend {
 
-    private final Map<String, User> clients;
+    private final Map<Socket, User> clients;
     private CryptManager cryptManager;
-
-    //
-
-
-
-
-
-
-
-
-    // USE buildOnUNIX.sh in root dir to ensure pulling and building the submodule at least once in order to use it for the build of the backend or client application
-
-
-
-
-
-
-
-
-    //
 
     public ChatHubBackend(Path pubPath, Path privPath, String password) throws Exception {
         this.clients = new HashMap<>();
         Path dataDir = LocalPaths.getData();
-        Path publicKeyPath = dataDir.resolve("public.key");
-        Path privateKeyPath = dataDir.resolve("private.key");
+        Path publicKeyPath = dataDir.resolve("id_chathub_srv");
+        Path privateKeyPath = dataDir.resolve("id_chathub_srv.pub");
         if (!publicKeyPath.toFile().exists() || !privateKeyPath.toFile().exists()) {
             CryptManager.init(pubPath, privPath, password);
         }
@@ -53,6 +34,7 @@ public class ChatHubBackend {
     }
 
     public static void main(String[] args) throws Exception {
+        Configuration.init();
         ServiceRegistrar.registerServices();
 
 //        final Scanner passwordScanner = new Scanner(System.in);
@@ -82,15 +64,13 @@ public class ChatHubBackend {
             }
             return packet;
         });
-        service.addResponseInterceptor((request, response) -> {
-            if (request instanceof HandshakeRequestEvent req) {
-                if (this.clients.containsKey(uuid)) {
-                    try {
-                        return CryptManager.encrypt(
-                                response.getData(), this.clients.get(uuid).getPublicKey());
-                    } catch (Exception e) {
-                        Log.warning(String.format("Could not encrypted response to %s", uuid), e);
-                    }
+        service.addResponseInterceptor((socket, request, response) -> {
+            if (this.clients.containsKey(socket)) {
+                try {
+                    return CryptManager.encrypt(
+                            response.getData(), this.clients.get(socket).getPublicKey());
+                } catch (Exception e) {
+                    Log.warning(String.format("Could not encrypted response to %s", this.clients.get(socket).getUUID()), e);
                 }
             }
             return null;

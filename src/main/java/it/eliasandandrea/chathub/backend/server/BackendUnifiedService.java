@@ -3,6 +3,7 @@ package it.eliasandandrea.chathub.backend.server;
 import it.eliasandandrea.chathub.backend.server.handlers.HandshakeHandler;
 import it.eliasandandrea.chathub.backend.server.handlers.RequestHandler;
 import it.eliasandandrea.chathub.shared.crypto.Packet;
+import it.eliasandandrea.chathub.shared.model.User;
 import it.eliasandandrea.chathub.shared.protocol.ClientEvent;
 import it.eliasandandrea.chathub.shared.protocol.ServerEvent;
 import it.eliasandandrea.chathub.shared.protocol.clientEvents.HandshakeRequestEvent;
@@ -52,7 +53,7 @@ public class BackendUnifiedService extends ServiceServer {
 
             Packet resPacket = new Packet(payload);
             for (final ResponseInterceptor interceptor : this.responseInterceptors) {
-                resPacket = interceptor.intercept(request, resPacket);
+                resPacket = interceptor.intercept(socket, request, resPacket);
             }
             return resPacket;
         }
@@ -84,6 +85,6 @@ public class BackendUnifiedService extends ServiceServer {
         Packet intercept(Packet packet);
     }
     public interface ResponseInterceptor {
-        Packet intercept(ClientEvent request, Packet response);
+        Packet intercept(Socket socket, ClientEvent request, Packet response);
     }
 }
