@@ -16,10 +16,13 @@ import it.eliasandandrea.chathub.shared.protocol.ServerEvent;
 import it.eliasandandrea.chathub.shared.protocol.clientEvents.HandshakeRequestEvent;
 import it.eliasandandrea.chathub.shared.protocol.clientEvents.SetUsernameEvent;
 import it.eliasandandrea.chathub.shared.protocol.serverEvents.ChatEntityAdded;
+import it.eliasandandrea.chathub.shared.protocol.serverEvents.ChatEntityRemoved;
 import it.eliasandandrea.chathub.shared.protocol.serverEvents.HandshakeResponseEvent;
+import it.eliasandandrea.chathub.shared.protocol.sharedEvents.MessageEvent;
 import it.eliasandandrea.chathub.shared.util.LocalPaths;
 import it.eliasandandrea.chathub.shared.util.Log;
 
+import java.net.Socket;
 import java.nio.file.Path;
 import java.util.*;
 
@@ -49,8 +52,8 @@ public class ChatHubBackend {
             CryptManager.init(groupPublicKeyPath, groupPrivateKeyPath, password);
         }
         CryptManager groupCryptManager = new CryptManager(groupPublicKeyPath, groupPrivateKeyPath, password);
-        Group publicGroup = new Group("Public Group", new User[0], groupCryptManager.publicKey, groupCryptManager.privateKey);
-        groups.add(publicGroup);
+        Group publicGroup = new Group("Group", new User[0], groupCryptManager.publicKey, groupCryptManager.privateKey);
+        this.groups.add(publicGroup);
     }
 
     public static void main(String[] args) throws Exception {
@@ -71,7 +74,39 @@ public class ChatHubBackend {
     public void start() throws Exception {
         String portStr = Configuration.getProp("port");
         int port = Integer.parseInt(portStr);
-        final BackendUnifiedService service = new BackendUnifiedService(port);
+        final BackendUnifiedService service = new BackendUnifiedService(port){
+            @Override
+            public void onException(Exception e, Socket socket) {
+                if (socket != null) {
+                    respondWithError(socket, e);
+                }
+                ClientConnection clientConnection =  clients.stream().filter(s -> s.getSocket() == socket).findFirst().orElse(null);
+                if (clientConnection != null){
+                    clients.remove(clientConnection);
+                    groups.forEach(group -> {
+                        //check if the user is in the group
+                        User[] participants = group.getParticipants();
+                        for (User participant : participants) {
+                            if (participant.equals(clientConnection.getUser())) {
+                                group.removeUser(clientConnection.getUser());
+                                break;
+                            }
+                        }
+                    });
+                    //send the event to all the clients
+                    ChatEntityRemoved event = new ChatEntityRemoved();
+                    event.uuid = clientConnection.getUser().getUUID();
+                    clients.forEach(c -> {
+                        try {
+                            c.sendEvent(event);
+                        } catch (Exception e1) {
+                            e1.printStackTrace();
+                        }
+                    });
+                }
+                Log.warning("exception in BackendUnifiedService", e);
+            }
+        };
         service.addPacketInterceptor(packet -> {
             try {
                 if (packet instanceof EncryptedObjectPacket eop) {
@@ -125,7 +160,7 @@ public class ChatHubBackend {
                     //combine values of users with groups into ChatEntity list
                     List<ChatEntity> chatEntities = new LinkedList<>();
                     chatEntities.addAll(this.groups);
-                    chatEntities.addAll(this.clients.stream().map(c -> c.getUser()).toList());
+                    chatEntities.addAll(this.clients.stream().map(ClientConnection::getUser).toList());
                     handshakeResponseEvent.chats = chatEntities.toArray(new ChatEntity[0]);
                     return handshakeResponseEvent;
                 }
@@ -138,6 +173,36 @@ public class ChatHubBackend {
                     User user = this.clients.stream().filter(s -> s.getSocket() == socket).findFirst().get().getUser();
                     user.username = event.username;
                     Log.info(String.format("User %s set username to %s", user.getUUID(), user.username));
+                    return null;
+                }
+        );
+
+        service.addHandler(
+                MessageEvent.class,
+                (RequestHandler<ClientEvent, ServerEvent>) (socket, din, dos, payload) -> {
+                    MessageEvent event = (MessageEvent) payload;
+                    //If receiver is user
+                    User recUser = this.clients.stream().map(ClientConnection::getUser).filter(s -> s.getUUID().equals(event.receiverUUID)).findFirst().orElse(null);
+                    if (recUser != null){
+                        try {
+                            this.clients.stream().filter(s -> s.getUser().getUUID().equals(event.receiverUUID)).findFirst().get().sendEvent(event);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                    //If receiver is group
+                    Group recGroup = this.groups.stream().filter(s -> s.getUUID().equals(event.receiverUUID)).findFirst().orElse(null);
+                    if (recGroup != null){
+                        for (User participant : recGroup.participants) {
+                            ClientConnection clientConnection = this.clients.stream().filter(s -> s.getUser().equals(participant)).findFirst().get();
+                            try {
+                                clientConnection.sendEvent(event);
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+
                     return null;
                 }
         );
