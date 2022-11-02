@@ -209,6 +209,7 @@ public class ChatHubBackend {
                     if (recGroup != null){
                         for (User participant : recGroup.participants) {
                             ClientConnection clientConnection = this.clients.stream().filter(s -> s.getUser().equals(participant)).findFirst().get();
+                            if (clientConnection.getUser().getUUID().equals(event.senderUUID)) continue;
                             try {
                                 clientConnection.sendEvent(event);
                             } catch (Exception e) {
