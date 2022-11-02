@@ -202,6 +202,7 @@ public class ChatHubBackend {
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
+                        return null;
                     }
                     //If receiver is group
                     Group recGroup = this.groups.stream().filter(s -> s.getUUID().equals(event.receiverUUID)).findFirst().orElse(null);
