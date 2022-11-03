@@ -8,7 +8,6 @@ import it.eliasandandrea.chathub.backend.zeroconf.ServiceRegistrar;
 import it.eliasandandrea.chathub.shared.crypto.CryptManager;
 import it.eliasandandrea.chathub.shared.crypto.EncryptedObjectPacket;
 import it.eliasandandrea.chathub.shared.crypto.Packet;
-import it.eliasandandrea.chathub.shared.model.ChatEntity;
 import it.eliasandandrea.chathub.shared.model.Group;
 import it.eliasandandrea.chathub.shared.model.User;
 import it.eliasandandrea.chathub.shared.protocol.ClientEvent;
@@ -16,8 +15,8 @@ import it.eliasandandrea.chathub.shared.protocol.ServerEvent;
 import it.eliasandandrea.chathub.shared.protocol.clientEvents.HandshakeRequestEvent;
 import it.eliasandandrea.chathub.shared.protocol.clientEvents.SetUsernameEvent;
 import it.eliasandandrea.chathub.shared.protocol.serverEvents.ChangeUsernameEvent;
-import it.eliasandandrea.chathub.shared.protocol.serverEvents.ChatEntityAdded;
-import it.eliasandandrea.chathub.shared.protocol.serverEvents.ChatEntityRemoved;
+import it.eliasandandrea.chathub.shared.protocol.serverEvents.ChatEntityAddedEvent;
+import it.eliasandandrea.chathub.shared.protocol.serverEvents.ChatEntityRemovedEvent;
 import it.eliasandandrea.chathub.shared.protocol.serverEvents.HandshakeResponseEvent;
 import it.eliasandandrea.chathub.shared.protocol.sharedEvents.MessageEvent;
 import it.eliasandandrea.chathub.shared.util.LocalPaths;
@@ -26,6 +25,7 @@ import it.eliasandandrea.chathub.shared.util.Log;
 import java.net.Socket;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class ChatHubBackend {
 
@@ -53,7 +53,7 @@ public class ChatHubBackend {
             CryptManager.init(groupPublicKeyPath, groupPrivateKeyPath, password);
         }
         CryptManager groupCryptManager = new CryptManager(groupPublicKeyPath, groupPrivateKeyPath, password);
-        Group publicGroup = new Group("Public Group", new User[0], groupCryptManager.publicKey, groupCryptManager.privateKey);
+        Group publicGroup = new Group("Public Group", groupCryptManager.publicKey, groupCryptManager.privateKey);
         publicGroup.UUID = UUID.randomUUID().toString();
         this.groups.add(publicGroup);
     }
@@ -87,16 +87,10 @@ public class ChatHubBackend {
                     clients.remove(clientConnection);
                     groups.forEach(group -> {
                         //check if the user is in the group
-                        User[] participants = group.getParticipants();
-                        for (User participant : participants) {
-                            if (participant.equals(clientConnection.getUser())) {
-                                group.removeUser(clientConnection.getUser());
-                                break;
-                            }
-                        }
+                        group.getParticipantsUUIDs().remove(clientConnection.getUser().getUUID());
                     });
                     //send the event to all the clients
-                    ChatEntityRemoved event = new ChatEntityRemoved();
+                    ChatEntityRemovedEvent event = new ChatEntityRemovedEvent();
                     event.uuid = clientConnection.getUser().getUUID();
                     clients.forEach(c -> {
                         try {
@@ -141,7 +135,7 @@ public class ChatHubBackend {
                     try {
                         newUser = new ClientConnection("", handshakeRequestEvent.getPublicKey(), socket, din, dos);
                         newUser.getUser().UUID = UUID.randomUUID().toString();
-                        ChatEntityAdded entityAdded = new ChatEntityAdded();
+                        ChatEntityAddedEvent entityAdded = new ChatEntityAddedEvent();
                         entityAdded.entity = newUser.getUser();
                         System.out.println("New user connected: " + newUser.getUser().getUUID());
                         //Broadcast join event
@@ -155,10 +149,10 @@ public class ChatHubBackend {
                         handshakeResponseEvent.uuid = newUser.getUser().getUUID();
                         handshakeResponseEvent.serverPublicKey = CryptManager.publicKeyToBytes(cryptManager.getPublicKey());
                         //combine values of users with groups into ChatEntity list
-                        handshakeResponseEvent.groups = this.groups.toArray(new Group[0]);
-                        handshakeResponseEvent.users = this.clients.stream().map(ClientConnection::getUser).toArray(User[]::new);
+                        handshakeResponseEvent.groups = (LinkedList<Group>) this.groups;
+                        handshakeResponseEvent.users = this.clients.stream().map(ClientConnection::getUser).collect(Collectors.toCollection(LinkedList::new));
                         this.clients.add(newUser);
-                        this.groups.get(0).addUser(newUser.getUser()); // Add user to public group
+                        this.groups.get(0).participantsUUIDs.add(newUser.getUser().getUUID()); // Add user to public group
                     } catch (Exception e) {
                         e.printStackTrace();
                         return null;
@@ -207,8 +201,8 @@ public class ChatHubBackend {
                     //If receiver is group
                     Group recGroup = this.groups.stream().filter(s -> s.getUUID().equals(event.receiverUUID)).findFirst().orElse(null);
                     if (recGroup != null){
-                        for (User participant : recGroup.participants) {
-                            ClientConnection clientConnection = this.clients.stream().filter(s -> s.getUser().equals(participant)).findFirst().get();
+                        for (String participantUUID : recGroup.getParticipantsUUIDs()) {
+                            ClientConnection clientConnection = this.clients.stream().filter(s -> s.getUser().getUUID().equals(participantUUID)).findFirst().get();
                             if (clientConnection.getUser().getUUID().equals(event.senderUUID)) continue;
                             try {
                                 clientConnection.sendEvent(event);
