@@ -16,7 +16,7 @@ public class ServiceRegistrar {
             int port = Integer.parseInt(portStr);
             // Register the control service and the chat service
             ServiceInfo chatServiceInfo = ServiceInfo.create("_chathub._tcp.local.",
-                    Configuration.getProp("name"), port, "");
+                    Configuration.getProp("name"), port, "ip=" + InetAddress.getLocalHost().getHostAddress());
             jmdns.registerService(chatServiceInfo);
 
             System.out.println("[Zeroconf] Services registered");

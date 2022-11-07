@@ -58,38 +58,60 @@ public class ChatHubBackend {
         this.groups.add(publicGroup);
     }
 
+    /**
+     * Initialization method for all parts of the backend infrastructure. It is responsible for:
+     * - bootstrapping the local persistent configuration
+     * - configuring service broadcasting on the local network
+     * - starting the backend service, i.e. the listening server
+     *
+     * @see ChatHubBackend#start()
+     */
     public static void main(String[] args) throws Exception {
         Configuration.init();
         ServiceRegistrar.registerServices();
-
-//        final Scanner passwordScanner = new Scanner(System.in);
-//        System.out.println("Passphrase: ");
-//        String password = passwordScanner.next();
-//        new ChatHubBackend(LocalPaths.concat(LocalPaths.getData(), "id_chathub_srv"),
-//                LocalPaths.concat(LocalPaths.getData(), "id_chathub_srv.pub"), password).start();
 
         new ChatHubBackend(
                 Configuration.properties.getProperty("keystorePassword")
         ).start();
     }
 
+    /**
+     * Starts the server listening on the local network and providing the chat service.
+     * The backend service is configured through listeners and callbacks to correctly process
+     * requests and responses from/to clients.
+     *
+     * @see BackendUnifiedService the main class providing the chat service
+     * @throws Exception in case of an unexpected and fatal exception, which is supposed
+     * to halt the exception of the backend service (all others are handled appropriately)
+     */
     public void start() throws Exception {
+        /* fetch the server listening port from local configuration */
         String portStr = Configuration.getProp("port");
         int port = Integer.parseInt(portStr);
+
+        /* extend the backend service in order to provide proper handling of exceptions */
         final BackendUnifiedService service = new BackendUnifiedService(port){
             @Override
             public void onException(Exception e, Socket socket) {
+                /* exception thrown and non-null socket: client is still connected and
+                   a suitable response can be sent back */
                 if (socket != null) {
                     respondWithError(socket, e);
                 }
-                ClientConnection clientConnection =  clients.stream().filter(s -> s.getSocket() == socket).findFirst().orElse(null);
+                ClientConnection clientConnection =  clients
+                        .stream()
+                        .filter(s -> s.getSocket() == socket)
+                        .findFirst()
+                        .orElse(null);
+                /* connected client (if any) is being disconnected from the server and
+                   thrown out of groups: update accordingly and notify other users */
                 if (clientConnection != null){
                     clients.remove(clientConnection);
                     groups.forEach(group -> {
-                        //check if the user is in the group
+                        // check if the user is in the group
                         group.getParticipantsUUIDs().remove(clientConnection.getUser().getUUID());
                     });
-                    //send the event to all the clients
+                    // send the event to all the clients
                     ChatEntityRemovedEvent event = new ChatEntityRemovedEvent();
                     event.uuid = clientConnection.getUser().getUUID();
                     clients.forEach(c -> {
@@ -103,6 +125,8 @@ public class ChatHubBackend {
                 Log.warning("exception in BackendUnifiedService", e);
             }
         };
+        /* request interceptor, responsible for decrypting incoming packets (if encrypted)
+           using the server's private key */
         service.addPacketInterceptor(packet -> {
             try {
                 if (packet instanceof EncryptedObjectPacket eop) {
@@ -113,6 +137,8 @@ public class ChatHubBackend {
             }
             return packet;
         });
+        /* response interceptor, responsible for finding the connected client by looking up
+           the socket in use and encrypting the outgoing packet with its public key */
         service.addResponseInterceptor((socket, request, response) -> {
             if (this.clients.stream().map(ClientConnection::getSocket).anyMatch(s -> s == socket)) {
                 try {
@@ -216,6 +242,7 @@ public class ChatHubBackend {
                 }
         );
 
+        /* main loop: wait for an incoming connection and setup a responding thread */
         boolean run = true;
         while (run) {
             try {

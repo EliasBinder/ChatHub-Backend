@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/ChatHub-Backend.iml" filepath="$PROJECT_DIR$/ChatHub-Backend.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../ChatHub-Backend.iml" filepath="$PROJECT_DIR$/../ChatHub-Backend.iml" />
     </modules>
   </component>
 </project>
