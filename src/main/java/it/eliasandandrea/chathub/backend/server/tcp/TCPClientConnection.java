@@ -1,5 +1,6 @@
-package it.eliasandandrea.chathub.backend.server;
+package it.eliasandandrea.chathub.backend.server.tcp;
 
+import it.eliasandandrea.chathub.backend.server.ClientConnection;
 import it.eliasandandrea.chathub.shared.crypto.CryptManager;
 import it.eliasandandrea.chathub.shared.crypto.EncryptedObjectPacket;
 import it.eliasandandrea.chathub.shared.model.User;
@@ -9,18 +10,16 @@ import it.eliasandandrea.chathub.shared.util.SocketStreams;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.net.Socket;
-import java.security.PublicKey;
 import java.util.concurrent.Executors;
 
-public class ClientConnection{
+public class TCPClientConnection extends ClientConnection {
 
     private DataInputStream inputStream;
     private DataOutputStream outputStream;
     private Socket socket;
-    private User user;
 
-    public ClientConnection(String username, PublicKey publicKey, Socket socket, DataInputStream inputStream, DataOutputStream outputStream) {
-        user = new User(username, publicKey);
+    public TCPClientConnection(User user, Socket socket, DataInputStream inputStream, DataOutputStream outputStream) {
+        super(user);
         this.socket = socket;
         this.inputStream = inputStream;
         this.outputStream = outputStream;

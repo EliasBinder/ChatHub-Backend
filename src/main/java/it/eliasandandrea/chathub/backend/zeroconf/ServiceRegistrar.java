@@ -1,6 +1,7 @@
 package it.eliasandandrea.chathub.backend.zeroconf;
 
 import it.eliasandandrea.chathub.backend.configUtil.Configuration;
+import it.eliasandandrea.chathub.shared.util.Log;
 
 import javax.jmdns.JmDNS;
 import javax.jmdns.ServiceInfo;
@@ -16,14 +17,14 @@ public class ServiceRegistrar {
             int port = Integer.parseInt(portStr);
             // Register the control service and the chat service
             ServiceInfo chatServiceInfo = ServiceInfo.create("_chathub._tcp.local.",
-                    Configuration.getProp("name"), port, "ip=" + InetAddress.getLocalHost().getHostAddress());
+                    Configuration.getProp("name"), port, "type=" + getType());
             jmdns.registerService(chatServiceInfo);
 
-            System.out.println("[Zeroconf] Services registered");
+            Log.info("[Zeroconf] Services registered");
 
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 jmdns.unregisterAllServices();
-                System.out.println("Services unregistered");
+                Log.info("Services unregistered");
                 try {
                     jmdns.close();
                 } catch (IOException e) {
@@ -33,6 +34,16 @@ public class ServiceRegistrar {
         } catch (Exception ex) {
             ex.printStackTrace();
         }
+    }
+
+    private static int getType(){
+        String mode = Configuration.getProp("mode");
+        if (mode.equals("tcp")){
+            return 1;
+        }else if (mode.equals("rmi")){
+            return 2;
+        }
+        return 1;
     }
 
 }

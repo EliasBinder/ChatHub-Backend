@@ -16,6 +16,7 @@ public class Configuration {
         put("name", "ChatHub Server");
         put("port", "5476");
         put("keystorePassword", "password");
+        put("mode", "rmi");
     }};
 
     public static void init(){
@@ -31,6 +32,13 @@ public class Configuration {
             }else{
                 properties = new Properties();
                 properties.load(new java.io.FileInputStream(configFile));
+                for (String key : defaultValues.keySet()){
+                    if (!properties.containsKey(key)){
+                        properties.setProperty(key, defaultValues.get(key));
+                    }
+                }
+                OutputStream outputStream = new FileOutputStream(configFile);
+                properties.store(outputStream, "ChatHub Server Configuration File");
             }
         } catch (URISyntaxException e) {
             e.printStackTrace();
@@ -52,6 +60,6 @@ public class Configuration {
     }
 
     private static File getJarPath() throws URISyntaxException {
-        return new File(Configuration.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        return new File(Configuration.class.getProtectionDomain().getCodeSource().getLocation().toURI()).getParentFile();
     }
 }

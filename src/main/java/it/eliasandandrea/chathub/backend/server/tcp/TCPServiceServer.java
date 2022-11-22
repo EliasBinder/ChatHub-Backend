@@ -1,5 +1,8 @@
-package it.eliasandandrea.chathub.backend.server;
+package it.eliasandandrea.chathub.backend.server.tcp;
 
+import it.eliasandandrea.chathub.backend.server.ClientConnection;
+import it.eliasandandrea.chathub.backend.server.ClientDisconnectCallback;
+import it.eliasandandrea.chathub.backend.server.ServiceServer;
 import it.eliasandandrea.chathub.shared.crypto.Packet;
 import it.eliasandandrea.chathub.shared.protocol.Error;
 import it.eliasandandrea.chathub.shared.util.Log;
@@ -32,7 +35,7 @@ import java.util.concurrent.Executors;
  * @see ServerSocket the underlying socket
  * @see Executors#newSingleThreadExecutor() used for handling connections in separate threads
  */
-public abstract class ServiceServer {
+public abstract class TCPServiceServer extends ServiceServer {
 
     private final ServerSocket socket;
 
@@ -43,8 +46,14 @@ public abstract class ServiceServer {
      * @param port to publish the service on
      * @throws Exception in case the port is taken or another socket-related error occurs
      */
-    public ServiceServer(int port) throws Exception {
+    public TCPServiceServer(int port, ClientDisconnectCallback disconnectCallback) throws Exception {
+        super(port, disconnectCallback);
         this.socket = new ServerSocket(port);
+        Executors.newSingleThreadExecutor().submit(() -> {
+            while (true) {
+                waitForConnection();
+            }
+        });
     }
 
     /**
@@ -55,7 +64,7 @@ public abstract class ServiceServer {
      * The onAccepted implementation is used to generate a response Packet for each
      * incoming stream that can be successfully parsed.
      *
-     * @see #onAccepted(Socket, DataInputStream, DataOutputStream) of this class's implementation
+     * @see #onAccepted(ClientConnection) of this class's implementation
      */
     public void waitForConnection() {
         try {
@@ -63,24 +72,23 @@ public abstract class ServiceServer {
             final DataInputStream dis = new DataInputStream(client.getInputStream());
             final DataOutputStream dos = new DataOutputStream(client.getOutputStream());
             Log.info("accepted from " + client.getInetAddress());
+            TCPClientConnection clientConnection = new TCPClientConnection(null, client, dis, dos);
             Executors.newSingleThreadExecutor().submit(() -> {
                 boolean connected = true;
                 while (connected){
                     try{
-                        Packet response = this.onAccepted(client, dis, dos);
+                        Packet response = this.onAccepted(clientConnection);
                         if (response != null) {
-                            Log.info("writing response");
                             SocketStreams.writeObject(dos, response);
                         }
                     } catch (Exception ex){
                         connected = false;
-                        Log.error(ex.getMessage());
-                        onException(ex, client);
+                        onConnectionClose(clientConnection);
                     }
                 }
             });
         } catch (Exception e) {
-            this.onException(e, null);
+            Log.warning("failed to accept connection", e);
         }
     }
 
@@ -88,26 +96,24 @@ public abstract class ServiceServer {
      * Convenience method to send the payload corresponding to an error that occurred back to
      * the connected client.
      * The corresponding socket is closed after the payload has been sent.
-     * @param socket established with the client, to which the error is related; the socket
+     * @param clientConnection established with the client, to which the error is related; the socket
      *               must be open
      * @param e the occurred Exception to be transmitted
      */
-    public static void respondWithError(Socket socket, Exception e) {
+    @Override
+    public void respondWithError(ClientConnection clientConnection, Exception e) {
+        TCPClientConnection tcpClientConnection = (TCPClientConnection) clientConnection;
         try {
             byte[] payload = ObjectByteConverter.serialize(
                     new Error(e.getClass().getSimpleName(), e.getMessage()));
             if (payload != null) {
-                socket.getOutputStream().write(payload);
-                socket.getOutputStream().close();
+                tcpClientConnection.getOutputStream().write(payload);
+                tcpClientConnection.getOutputStream().close();
             } else {
-                socket.close();
+                tcpClientConnection.getSocket().close();
             }
         } catch (IOException ie) {
             Log.warning("Could not respond with error", ie);
         }
     }
-
-    public abstract Packet onAccepted(Socket socket, DataInputStream dis, DataOutputStream dos) throws IOException;
-
-    public abstract void onException(Exception e, Socket socket);
 }
