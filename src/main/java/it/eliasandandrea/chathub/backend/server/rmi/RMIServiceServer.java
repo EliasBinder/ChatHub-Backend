@@ -9,11 +9,17 @@ import it.eliasandandrea.chathub.backend.server.rmi.implementations.RmiHandshake
 
 import java.rmi.Naming;
 import java.rmi.Remote;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
 
 public abstract class RMIServiceServer extends ServiceServer {
 
+    private Registry registry;
+
     public RMIServiceServer(int port, ClientDisconnectCallback disconnectCallback, UUIDResolver resolver) throws Exception{
         super(port, disconnectCallback);
+
+        registry = LocateRegistry.createRegistry(port);
 
         Remote handshakeRemote = new RmiHandshakeImpl(responseInterceptors, handlers);
         Naming.rebind("rmi://localhost:" + port + "/handshake", handshakeRemote);
